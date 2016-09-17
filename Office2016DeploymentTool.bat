@@ -28,7 +28,7 @@ pushd %CD% & CD /d %~dp0
 ::> Change the below UNC path to your shared directory <::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-SET "DEPLOYDIR=\\SERVER01\dfs$\InstallOffice"
+SET "DEPLOYDIR=\\SERVER01\Office2016\DeploymentTool"
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 ::> If you are not in a domain, remove the 4 instances of %USERDOMAIN%\ <::
@@ -54,7 +54,13 @@ SET "KEYC2RPROJECT16=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Pr
 SET "KEYC2RVISIO16=HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\VisioStdXVolume - en-us"
 SET "KEYC2RPOLICY=HKLM\SOFTWARE\Policies\Microsoft\office\16.0\common\officeupdate"
 SET "KEYC2RCONFIG=HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration"
+IF NOT EXIST "%DEPLOYDIR%\Alpha\x64" MD "%DEPLOYDIR%\Alpha\x64" 2>nul
+IF NOT EXIST "%DEPLOYDIR%\Alpha\x86" MD "%DEPLOYDIR%\Alpha\x86" 2>nul
+IF NOT EXIST "%DEPLOYDIR%\Beta\x64" MD "%DEPLOYDIR%\Beta\x64" 2>nul
+IF NOT EXIST "%DEPLOYDIR%\Beta\x86" MD "%DEPLOYDIR%\Beta\x86" 2>nul
 IF NOT EXIST "%DEPLOYDIR%\Download" MD "%DEPLOYDIR%\Download" 2>nul
+IF NOT EXIST "%DEPLOYDIR%\All\x64" MD "%DEPLOYDIR%\All\x64" 2>nul
+IF NOT EXIST "%DEPLOYDIR%\All\x86" MD "%DEPLOYDIR%\All\x86" 2>nul
 FOR /d %%R in ("%LOGDIR%\Temp\*.*") do RD "%%R" /s /q 2>nul
 IF NOT EXIST "%LOGDIR%\Temp" MD "%LOGDIR%\Temp" 2>nul
 IF NOT EXIST "%XMLDIR%" MD "%XMLDIR%" 2>nul
@@ -97,9 +103,9 @@ GOTO STARTODT2016
 ::~~~~~~~~~~~~~~~~::
 :DOWNLOADC2R
 echo.
-echo ^> This will download the selected channel to:
-echo ^> "%DEPLOYDIR%\Download"
-echo ^> See version history for what releases are currently available.
+echo This will download the selected channel to:
+echo "%DEPLOYDIR%\Download"
+::echo See version history for what releases are currently available.
 echo.
 echo [C] Current channel
 echo [D] Deferred channel
@@ -119,15 +125,20 @@ SET "SETUPTYPE=Download"
 call :SETBITNESSC2R
 call :XMLDOWNLOADC2R
 echo.
-echo Downloading, please wait...
+echo Download started at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%, please wait...
 "%DEPLOYDIR%\setup.exe" /download "%XMLDIR%\Config%SETUPTYPE%%PRODUCT_ID%-%C2RCHANNEL%_%BITNESS%.xml"
-IF %ERRORLEVEL% EQU 0 (
-echo. & echo Download SUCCESS^^!
+IF %ERRORLEVEL% NEQ 0 (
+echo. & echo Download completed at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%, FAIL^^! Error %ERRORLEVEL%
+echo. & pause & GOTO STARTODT2016
 ) else (
-echo. & echo Download FAILED^^!
+echo. & echo Download completed at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%, SUCCESS^^!
 )
 echo.
-pause
+choice /c YN /N /M "Open containing folder? <Y/N>"
+IF ERRORLEVEL 2 GOTO ENDDOWNLOADC2R
+IF ERRORLEVEL 1 EXPLORER "%DEPLOYDIR%\Download\%PRODUCT_ID%-%C2RCHANNEL%Channel%BITNESS%_%CURDATE%"
+:ENDDOWNLOADC2R
+echo. & pause
 GOTO STARTODT2016
 
 ::~~~~~~~~~~~~~~~~~::
@@ -172,7 +183,7 @@ echo ---------------------------------------
 )
 
 :CHOICEUPDATEC2R
-echo.
+::echo.
 echo [1] Install updates
 echo [2] Change update path
 echo [X] Cancel
@@ -210,7 +221,7 @@ echo ^> Changing to this path will require a downgrade
 echo ------------------------------------------------ & echo.
 )
 choice /c YN /N /M "Do you want to continue? <Y/N>"
-IF ERRORLEVEL 2 GOTO QUERYSOURCEC2R
+IF ERRORLEVEL 2 GOTO STARTODT2016
 IF ERRORLEVEL 1 GOTO RUNCHANGEPATHC2R
 
 :RUNCHANGEPATHC2R
@@ -236,7 +247,7 @@ echo ^> Client version is higher than source^^!
 echo ---------------------------------------
 echo.
 choice /c YN /N /M "Do you want to downgrade the installation? <Y/N>"
-IF ERRORLEVEL 2 GOTO QUERYSOURCEC2R
+IF ERRORLEVEL 2 GOTO STARTODT2016
 IF ERRORLEVEL 1 SET "SKIPREGPATH=Y" & call :DOWNGRADEC2R & call :REGQUERYC2R
 GOTO QUERYSOURCEC2R
 )
@@ -329,7 +340,7 @@ IF ERRORLEVEL 1 GOTO RUNUNINSTC2R
 :RUNUNINSTC2R
 call :SCHEDRUNC2R
 call :SETUPWAITC2R
-echo. & pause & echo. & GOTO STARTUNINSTALLC2R
+echo. & pause & GOTO STARTODT2016
 
 ::~~~~~~~::
 ::Install::
@@ -563,7 +574,6 @@ choice /c YN /N /M "Force close Office apps? <Y/N>"
 IF ERRORLEVEL 2 SET "SWITCHFORCEC2R=False" & echo. & GOTO EOF
 IF ERRORLEVEL 1 SET "SWITCHFORCEC2R=True" & echo. & GOTO EOF
 
-
 :DEPLOYSETUPC2R
 MD "\\%MACHINE%\%SETUPDIRNET%" 2>nul
 (
@@ -600,14 +610,14 @@ echo SET "SETUPCHECK=0"
 echo ^)
 )
 echo ^(
-echo echo Setup completed at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%
+echo echo Setup completed at %%time:~-11,2%%:%%time:~-8,2%%:%%time:~-5,2%%
 echo echo.
 echo IF %%SETUPCHECK%% EQU 0 ^(
 echo echo Successfully %SETUPTYPE%ed %PRODUCT_ID%
 echo ^) else ^(
 echo echo FAILED^^! to %SETUPTYPE% %PRODUCT_ID%
 echo ^)
-echo ^) ^> %LOGDIR%\%MACHINE%_%SETUPTYPE%%PRODUCT_ID%%BITNESS%-%CURDATE%.log
+echo ^) ^> "%LOGDIR%\%MACHINE%_%SETUPTYPE%%PRODUCT_ID%%BITNESS%-%CURDATE%.log"
 echo TIMEOUT /t 5 /nobreak ^>nul
 echo SCHTASKS /delete /tn "Office2016_%SETUPTYPE%" /f
 echo CD /d C:\
@@ -626,7 +636,7 @@ echo ^) else ^(
 echo SET "RESULT=FAIL"
 echo ^)
 echo ^(
-echo echo OfficeC2RClient executed at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%
+echo echo OfficeC2RClient executed at %%time:~-11,2%%:%%time:~-8,2%%:%%time:~-5,2%%
 echo echo Exit code: %%EXITCODE%%
 echo echo %%RESULT%%
 echo ^) ^> %LOGDIR%\%MACHINE%_%SETUPTYPE%%PLATFORMC2R%-%CURDATE%.log
@@ -648,7 +658,7 @@ echo ^) else ^(
 echo SET "RESULT=FAIL"
 echo ^)
 echo ^(
-echo echo OfficeC2RClient executed at %time:~-11,2%:%time:~-8,2%:%time:~-5,2%
+echo echo OfficeC2RClient executed at %%time:~-11,2%%:%%time:~-8,2%%:%%time:~-5,2%%
 echo echo Exit code: %%EXITCODE%%
 echo echo %%RESULT%%
 echo ^) ^> %LOGDIR%\%MACHINE%_%SETUPTYPE%%PLATFORMC2R%-%CURDATE%.log
